@@ -4,7 +4,6 @@ import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import PointCloud2
 from vision_msgs.msg import Detection3D, Detection3DArray, ObjectHypothesisWithPose
-from visualization_msgs.msg import Marker, MarkerArray
 import numpy as np
 import torch
 from mmdet3d.apis import init_model, inference_detector
@@ -62,7 +61,6 @@ class CenterPointNode(Node):
 
         self.sub = self.create_subscription(PointCloud2, self.lidar_topic, self.listener_callback, 1)
         self.box_pub = self.create_publisher(Detection3DArray, '/detected_objects', 1)
-        self.text_pub = self.create_publisher(MarkerArray, '/detected_scores', 1)
         
         self.latest_msg = None
         self.msg_lock = threading.Lock()
@@ -114,11 +112,6 @@ class CenterPointNode(Node):
         
         detection_array = Detection3DArray()
         detection_array.header = msg.header
-
-        text_array = MarkerArray()
-        del_marker = Marker()
-        del_marker.action = Marker.DELETEALL
-        text_array.markers.append(del_marker)
         
         for i, bbox in enumerate(bboxes):
             if scores[i] < 0.5: continue
@@ -147,27 +140,8 @@ class CenterPointNode(Node):
             detection.bbox.size.z = float(h)
             
             detection_array.detections.append(detection)
-
-            text_marker = Marker()
-            text_marker.header = msg.header
-            text_marker.ns = "score_text"
-            text_marker.id = i
-            text_marker.type = Marker.TEXT_VIEW_FACING
-            text_marker.action = Marker.ADD
-            text_marker.pose.position.x = float(cx)
-            text_marker.pose.position.y = float(cy)
-            text_marker.pose.position.z = float(cz + h/2 + 0.8)
-            text_marker.scale.z = 0.6
-            text_marker.color.r = 1.0
-            text_marker.color.g = 1.0
-            text_marker.color.b = 0.0
-            text_marker.color.a = 1.0
-            text_marker.text = f"CLS: {label_idx} [{score:.2f}]"
-            
-            text_array.markers.append(text_marker)
             
         self.box_pub.publish(detection_array)
-        self.text_pub.publish(text_array)
 
     def destroy_node(self):
         self.running = False
